@@ -1,0 +1,247 @@
+import json
+import os
+
+# ============================================
+# ========= AVL TREE (Indexador) =============
+# ============================================
+
+class Node:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+        self.left = None
+        self.right = None
+        self.height = 1
+
+class AVLTree:
+
+    def get_height(self, node):
+        return 0 if node is None else node.height
+
+    def get_balance(self, node):
+        return self.get_height(node.left) - self.get_height(node.right)
+
+    def right_rotate(self, y):
+        x = y.left
+        T2 = x.right
+
+        x.right = y
+        y.left = T2
+
+        y.height = 1 + max(self.get_height(y.left), self.get_height(y.right))
+        x.height = 1 + max(self.get_height(x.left), self.get_height(x.right))
+
+        return x
+
+    def left_rotate(self, x):
+        y = x.right
+        T2 = y.left
+
+        y.left = x
+        x.right = T2
+
+        x.height = 1 + max(self.get_height(x.left), self.get_height(x.right))
+        y.height = 1 + max(self.get_height(y.left), self.get_height(y.right))
+
+        return y
+
+    def insert(self, root, key, value):
+        if root is None:
+            return Node(key, value)
+
+        if key < root.key:
+            root.left = self.insert(root.left, key, value)
+        elif key > root.key:
+            root.right = self.insert(root.right, key, value)
+        else:
+            return root
+
+        root.height = 1 + max(self.get_height(root.left), self.get_height(root.right))
+        balance = self.get_balance(root)
+
+        if balance > 1 and key < root.left.key:
+            return self.right_rotate(root)
+
+        if balance < -1 and key > root.right.key:
+            return self.left_rotate(root)
+
+        if balance > 1 and key > root.left.key:
+            root.left = self.left_rotate(root.left)
+            return self.right_rotate(root)
+
+        if balance < -1 and key < root.right.key:
+            root.right = self.right_rotate(root.right)
+            return self.left_rotate(root)
+
+        return root
+
+
+# ============================================
+# ========= INSERTION SORT ===================
+# ============================================
+
+def insertion_sort(lista, key):
+    for i in range(1, len(lista)):
+        atual = lista[i]
+        j = i - 1
+        while j >= 0 and lista[j][key] > atual[key]:
+            lista[j + 1] = lista[j]
+            j -= 1
+        lista[j + 1] = atual
+    return lista
+
+
+# ============================================
+# ========= CARREGAR / SALVAR JSON ===========
+# ============================================
+
+ARQUIVO = "dados.json"
+
+def carregar_dados():
+    if not os.path.exists(ARQUIVO):
+        return {"itens": [], "pedidos": []}
+
+    with open(ARQUIVO, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def salvar_dados(dados):
+    with open(ARQUIVO, "w", encoding="utf-8") as f:
+        json.dump(dados, f, indent=4, ensure_ascii=False)
+
+
+# ============================================
+# ========= FUNÇÕES PRINCIPAIS ===============
+# ============================================
+
+def registrar_item(dados):
+    print("\n--- CADASTRAR ITEM NO CARDÁPIO ---")
+    id_item = input("ID do item: ")
+    nome = input("Nome do item: ")
+    preco = float(input("Preço: "))
+
+    item = {
+        "id": id_item,
+        "nome": nome,
+        "preco": preco
+    }
+
+    dados["itens"].append(item)
+    salvar_dados(dados)
+    print("Item adicionado ao cardápio!")
+
+
+def mostrar_cardapio(dados):
+    print("\n===== CARDÁPIO =====")
+    if not dados["itens"]:
+        print("Nenhum item cadastrado.")
+        return
+    for item in dados["itens"]:
+        print(f"{item['id']} - {item['nome']} - R$ {item['preco']}")
+    print("====================")
+
+
+def realizar_pedido(dados):
+    print("\n--- REALIZAR PEDIDO ---")
+    nome_cliente = input("Nome do cliente: ")
+
+    pedido = {
+        "id": str(len(dados["pedidos"]) + 1),
+        "cliente": nome_cliente,
+        "itens": []
+    }
+
+    mostrar_cardapio(dados)
+
+    while True:
+        escolha = input("Digite o ID do item para adicionar (ou 'sair'): ")
+        if escolha.lower() == "sair":
+            break
+
+        encontrado = False
+        for item in dados["itens"]:
+            if item["id"] == escolha:
+                pedido["itens"].append(item)
+                encontrado = True
+                print(f"Item '{item['nome']}' adicionado!")
+                break
+
+        if not encontrado:
+            print("Item não encontrado!")
+
+    if len(pedido["itens"]) == 0:
+        print("Pedido vazio! Cancelado.")
+        return
+
+    dados["pedidos"].append(pedido)
+    salvar_dados(dados)
+
+    print("\nPedido realizado com sucesso!")
+    print(f"ID do pedido: {pedido['id']}")
+
+
+def relatorio_pedidos(dados):
+    print("\n===== RELATÓRIO DE PEDIDOS =====")
+
+    if not dados["pedidos"]:
+        print("Nenhum pedido registrado.")
+        return
+
+    ordenados = insertion_sort(dados["pedidos"], "id")
+
+    for p in ordenados:
+        print(f"Pedido {p['id']} | Cliente: {p['cliente']} | Itens: {len(p['itens'])}")
+
+    print("===============================")
+
+
+def carregar_em_avl(dados):
+    arv_itens = AVLTree()
+    arv_pedidos = AVLTree()
+
+    raiz_itens = None
+    raiz_pedidos = None
+
+    for it in dados["itens"]:
+        raiz_itens = arv_itens.insert(raiz_itens, it["id"], it)
+
+    for p in dados["pedidos"]:
+        raiz_pedidos = arv_pedidos.insert(raiz_pedidos, p["id"], p)
+
+    print("Indexador AVL carregado!")
+    return raiz_itens, raiz_pedidos
+
+
+# ============================================
+# ===================== MENU =================
+# ============================================
+
+def menu():
+    dados = carregar_dados()
+
+    carregar_em_avl(dados)
+
+    while True:
+        print("\n====== SISTEMA DE CARDÁPIO + PEDIDOS ======")
+        print("1 - Cadastrar item no cardápio")
+        print("2 - Mostrar cardápio")
+        print("3 - Realizar pedido")
+        print("4 - Relatório de pedidos (ordenado)")
+        print("5 - Sair")
+
+        op = input("Escolha: ")
+
+        if op == "1":
+            registrar_item(dados)
+        elif op == "2":
+            mostrar_cardapio(dados)
+        elif op == "3":
+            realizar_pedido(dados)
+        elif op == "4":
+            relatorio_pedidos(dados)
+        elif op == "5":
+            print("Encerrando...")
+            break
+        else:
+            print("Opção inválida.")
+
+menu()
